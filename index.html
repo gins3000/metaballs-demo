@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>Metaballs Demo</title>
+</head>
+
+<body>
+  <canvas width="400" height="300"></canvas>
+
+  <script>
+    // get canvas and context
+    const canvas = document.querySelector('canvas');
+    const ctx = canvas.getContext('2d');
+
+    // set up some circles with random velocity
+    const circles = [
+      { x: 50, y: 100, r: 5, vx: -0.5 + Math.random(), vy: -0.5 + Math.random() },
+      { x: 350, y: 200, r: 10, vx: -0.5 + Math.random(), vy: -0.5 + Math.random() },
+      { x: 200, y: 150, r: 15, vx: -0.5 + Math.random(), vy: -0.5 + Math.random() },
+      { x: 50, y: 200, r: 20, vx: -0.5 + Math.random(), vy: -0.5 + Math.random() },
+      { x: 350, y: 100, r: 25, vx: -0.5 + Math.random(), vy: -0.5 + Math.random() },
+    ];
+
+    // For rendering, take 1 more to each side of the canvas to avoid edge artifacts
+    const imageDataWidth = canvas.width + 2;
+    const imageDataHeight = canvas.height + 2;
+
+    // set up some data structures and set the alpha channel of the ImageData to "fully visible"
+    const data = new Uint8Array(imageDataWidth * imageDataHeight);
+    const imageData = new ImageData(imageDataWidth, imageDataHeight);
+    for (let i = 3; i < imageData.data.length; i += 4) imageData.data[i] = 255;
+
+    // renders one frame
+    function render() {
+      // traverse the grid and set 1 to each pixel "within" the collective metaball shape
+      for (let i = 1, x = 0, y = 0; i < data.length; i++, x++) {
+        if (x >= imageDataWidth) {
+          x = 0;
+          y++;
+        }
+
+        let value = 0;
+        for (const c of circles) {
+          value += c.r / Math.sqrt((c.x - x) ** 2 + (c.y - y) ** 2);
+        }
+
+        data[i] = value > 1 ? 1 : 0;
+      }
+
+      // simple edge detection with a 3x3 square
+      for (let
+        // 3x3 square in the top left
+        i00 = 0,                  i01 = 1,                      i02 = 2,
+        i10 = imageDataWidth,     i11 = imageDataWidth + 1,     i12 = imageDataWidth + 2,
+        i20 = imageDataWidth * 2, i21 = imageDataWidth * 2 + 1, i22 = imageDataWidth * 2 + 2;
+
+        i22 < imageData.data.length;
+
+        // increase each value by 1 to march through the grid.
+        i00++, i01++, i02++,
+        i10++, i11++, i12++,
+        i20++, i21++, i22++
+      ) {
+        // calculate the sum of 1s in the current grid position (something between 0 and 9)
+        // the closer this value is to 4.5, the more split 1s and 0s we have, so the more pronounced the edge.
+        // the result is something between 0 and 1
+        const edginess = 1 - Math.abs((data[i00] + data[i01] + data[i02] + data[i10] + data[i11] + data[i12] + data[i20] + data[i21] + data[i22]) / 4.5 - 1);
+
+        // set the red value based on the "edginess"
+        imageData.data[i11 * 4] = Math.floor(edginess * 255);
+      }
+
+      // draw the image data onto the canvas, account for the extra rows and columns at the edges
+      ctx.putImageData(imageData, -1, -1);
+    }
+
+    // a simple render loop
+    let lastMs = Date.now();
+    function renderLoop() {
+      const currentMs = Date.now();
+      const deltaMs = currentMs - lastMs;
+      lastMs = currentMs;
+      for (const c of circles) {
+        // move each circle by its velocity
+        c.x += deltaMs / 20 * c.vx;
+        c.y += deltaMs / 20 * c.vy;
+
+        // and bounce against the edges
+        if (c.x >= canvas.width - c.r || c.x <= c.r) c.vx *= -1;
+        if (c.y >= canvas.height - c.r || c.y <= c.r) c.vy *= -1;
+      }
+
+      render();
+
+      requestAnimationFrame(renderLoop);
+    };
+
+    requestAnimationFrame(renderLoop);
+  </script>
+</body>
+
+</html>
